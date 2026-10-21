@@ -1,162 +1,216 @@
-"use client";
-import { useState, useEffect } from "react";
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mitha Tiwana Super Store</title>
+  <!-- Tailwind CSS CDN for modern grid design -->
+  <link href="https://jsdelivr.net" rel="stylesheet">
+</head>
+<body class="bg-gray-50 pb-24 font-sans">
 
-// --- MITHA TIWANA STORE REAL credentials ---
-const firebaseConfig = {
-  apiKey: "AIzaSyD-placeholder-apna-yahan-dalo", // Yara isko bas deployment ke waqt active rakhna
-  authDomain: "://firebaseapp.com",
-  projectId: "mitha-tiwana-store",
-  storageBucket: "://appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
-};
+  <!-- APP NAVBAR -->
+  <header class="bg-green-700 text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md">
+    <div>
+      <h1 class="font-extrabold text-lg">Mitha Tiwana Super Store</h1>
+      <p class="text-[10px] text-green-100">Khushab • Delivery Panel Active</p>
+    </div>
+    <button id="adminBtn" class="bg-white text-green-700 px-4 py-1.5 rounded-full text-xs font-bold shadow hover:bg-green-50">
+      Owner Panel
+    </button>
+  </header>
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
+  <!-- COMPACT SEARCH BAR -->
+  <div class="p-4 max-w-xl mx-auto">
+    <input id="searchInput" type="text" placeholder="🔍 Kucch bhi dhoondein..." class="w-full border border-gray-200 p-3 rounded-2xl shadow-sm focus:outline-none bg-white">
+  </div>
 
-export default function Page() {
-  const [products, setProducts] = useState([]);
-  const [search, setSearch] = useState("");
-  const [admin, setAdmin] = useState(false);
-  const [login, setLogin] = useState(false);
-  const [pass, setPass] = useState("");
-  const [form, setForm] = useState({ name: "", price: "", image: "" });
-  const [loading, setLoading] = useState(true);
+  <!-- PRODUCTS DISPLAY GRID -->
+  <main class="max-w-6xl mx-auto p-4">
+    <div id="loadingView" class="text-center my-20 hidden">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700 mx-auto"></div>
+      <p class="text-gray-400 text-xs mt-2">Products load ho rahi hain...</p>
+    </div>
+    <div id="productsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- Products will load dynamically -->
+    </div>
+  </main>
 
-  const EASYPAISA_NUMBER = "03247296703";
-  const WHATSAPP = "923247296703";
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
-      const s = await getDocs(q);
-      setProducts(s.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.error("Load Error:", err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => { load(); }, []);
-
-  const onImage = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = 600;
-        c.height = img.height * (600 / img.width);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-        setForm({ ...form, image: c.toDataURL("image/jpeg", 0.6) });
-      };
-      img.src = ev.target.result;
-    };
-    r.readAsDataURL(file);
-  };
-
-  const add = async () => {
-    try {
-      if (!form.name || !form.price || !form.image) return alert("Sab bharo");
-      await addDoc(collection(db, "products"), { ...form, createdAt: Date.now() });
-      setForm({ name: "", price: "", image: "" });
-      alert("Product uploaded smoothly!");
-      load();
-    } catch (err) {
-      console.error("Add Error:", err.message);
-      alert(err.message);
-    }
-  };
-
-  const del = async (id) => {
-    try {
-      if (!confirm("Delete?")) return;
-      await deleteDoc(doc(db, "products", id));
-      load();
-    } catch (err) {
-      console.error("Delete Error:", err.message);
-    }
-  };
-
-  const list = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-
-  return (
-    <div className="min-h-screen bg-gray-50 pb-24 font-sans">
-      <header className="bg-green-700 text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-        <div>
-          <h1 className="font-extrabold text-base">Mitha Tiwana Super Store</h1>
-          <p className="text-[10px] text-green-100">Khushab Delivery Active</p>
-        </div>
-        <button onClick={() => setAdmin(true)} className="bg-white text-green-700 px-4 py-1.5 rounded-full text-xs font-bold shadow-sm">Owner Panel</button>
-      </header>
-
-      <div className="p-4 max-w-xl mx-auto">
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Products search karein..." className="w-full border border-gray-200 p-3 rounded-2xl bg-white shadow-sm focus:outline-none" />
+  <!-- POPUP MODAL (ADMIN CONTROL PANEL) -->
+  <div id="adminModal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl relative">
+      <button id="closeModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+      
+      <!-- Login View -->
+      <div id="loginView">
+        <h2 class="font-black text-xl text-gray-800">Owner Login</h2>
+        <p class="text-xs text-gray-400 mt-0.5">Control panel open karne ke liye key enter karein</p>
+        <input id="passInput" type="password" placeholder="Mitha@123" class="w-full border p-3 rounded-xl mt-4 focus:outline-none">
+        <button id="loginBtn" class="w-full bg-green-700 text-white py-3 rounded-xl mt-3 font-bold shadow-md">Verify Admin Login</button>
       </div>
 
-      <main className="max-w-6xl mx-auto p-4">
-        {loading ? (
-          <p className="text-center py-20 text-gray-400 text-sm">Loading...</p>
-        ) : list.length === 0 ? (
-          <p className="text-center py-20 text-gray-400 text-sm">Koi item nahi mila.</p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {list.map(p => (
-              <div key={p.id} className="bg-white rounded-2xl border border-gray-100 p-3 flex flex-col justify-between shadow-sm">
-                <div>
-                  <img src={p.image} alt={p.name} className="h-36 w-full object-cover rounded-xl bg-gray-50" />
-                  <h3 className="font-bold text-xs mt-2 text-gray-800 line-clamp-2">{p.name}</h3>
-                  <p className="text-red-600 font-extrabold text-sm mt-1">Rs. {p.price}</p>
-                </div>
-                <div className="mt-2 space-y-1">
-                  <a href={`https://wa.me{WHATSAPP}?text=Salam,%20mujhe%20ye%20item%20chahiye:%20${encodeURIComponent(p.name)}`} target="_blank" className="block text-center bg-[#25D366] text-white py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-green-600">🟢 WhatsApp Order</a>
-                  {login && (
-                    <button onClick={() => del(p.id)} className="w-full bg-red-50 text-red-600 py-1 rounded-lg text-[10px] font-bold">Remove Stock</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
-
-      {admin && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl relative">
-            <button onClick={() => setAdmin(false)} className="absolute top-4 right-4 text-gray-400 font-bold">✕</button>
-            {!login ? (
-              <div>
-                <h2 className="font-black text-xl text-gray-800">Owner Login</h2>
-                <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mitha@123" className="w-full border p-3 rounded-xl mt-4 focus:outline-none" />
-                <button onClick={() => { if (pass === "Mitha@123") setLogin(true); else alert("Wrong Password"); }} className="w-full bg-green-700 text-white py-3 rounded-xl mt-3 font-bold shadow-md">Verify Admin</button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <h2 className="font-bold text-lg text-gray-800">Add Product</h2>
-                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Item Name" className="w-full border p-2.5 rounded-xl text-sm" />
-                <input value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Price" className="w-full border p-2.5 rounded-xl text-sm" />
-                <input type="file" accept="image/*" onChange={onImage} className="w-full mt-2 text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:bg-green-50 file:text-green-700" />
-                {form.image && <img src={form.image} alt="preview" className="h-16 mx-auto rounded shadow-sm" />}
-                <button onClick={add} className="w-full bg-blue-600 text-white py-2.5 rounded-xl mt-2 font-bold shadow-sm">Upload to Store</button>
-              </div>
-            )}
-          </div>
+      <!-- Upload View -->
+      <div id="uploadView" class="space-y-3 hidden">
+        <div class="flex justify-between items-center border-b pb-1">
+          <h2 class="font-bold text-lg text-green-700">Add Stock Active</h2>
+          <button id="logoutBtn" class="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">Logout</button>
         </div>
-      )}
-
-      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-around items-center z-40 shadow-md">
-        <div className="text-center">
-          <p className="text-[9px] text-gray-400 font-bold uppercase">EasyPaisa Account</p>
-          <p className="text-xs font-black text-gray-800">{EASYPAISA_NUMBER}</p>
-        </div>
-        <div className="h-5 w-px bg-gray-200"></div>
-        <a href={`https://wa.me{WHATSAPP}`} target="_blank" className="bg-[#25D366] text-white px-5 py-2 rounded-full text-xs font-bold shadow-sm">Chat on WhatsApp</a>
-      </footer>
+        <input id="prodName" type="text" placeholder="Item Name" class="w-full p-2.5 border rounded-xl text-sm">
+        <input id="prodPrice" type="text" placeholder="Qeemat (e.g. 240)" class="w-full p-2.5 border rounded-xl text-sm">
+        <input id="prodFile" type="file" accept="image/*" class="w-full p-1 text-xs text-gray-500">
+        <button id="uploadBtn" class="w-full bg-blue-600 text-white py-2.5 rounded-xl text-sm font-bold shadow hover:bg-blue-700">Upload Product</button>
+      </div>
     </div>
-  );
-}
+  </div>
+
+  <!-- MOBILE FOOTERBAR -->
+  <footer class="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-around items-center z-40 shadow-lg">
+    <div class="text-center">
+      <p class="text-[9px] text-gray-400 font-bold tracking-wider uppercase">EasyPaisa Account</p>
+      <p class="text-xs font-black text-gray-800">03247296703</p>
+    </div>
+    <div class="h-5 w-px bg-gray-200"></div>
+    <div class="text-center">
+      <p class="text-[9px] text-gray-400 font-bold tracking-wider uppercase">WhatsApp Call</p>
+      <p class="text-xs font-black text-green-700">+923247296703</p>
+    </div>
+  </footer>
+
+  <!-- Firebase Legacy Scripts Support for Static HTML -->
+  <script src="https://gstatic.com"></script>
+  <script src="https://gstatic.com"></script>
+
+  <script>
+    // Config Connection Details
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-placeholder-apna-yahan-dalo", // Yara isko bas deployment ke waqt active rakhna
+      authDomain: "://firebaseapp.com",
+      projectId: "mitha-tiwana-store",
+      storageBucket: "://appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef"
+    };
+    
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    const db = firebase.firestore();
+
+    let localProducts = [];
+    let isLogged = false;
+    let base64Image = "";
+
+    // Fetch database entries
+    async function loadData() {
+      const loader = document.getElementById('loadingView');
+      loader.classList.remove('hidden');
+      try {
+        const snap = await db.collection("products").orderBy("createdAt", "desc").get();
+        localProducts = [];
+        snap.forEach(doc => { localProducts.push({ id: doc.id, ...doc.data() }); });
+        renderProducts(localProducts);
+      } catch(e) {
+        console.error("Firebase fetch error:", e);
+      } finally {
+        loader.classList.add('hidden');
+      }
+    }
+
+    function renderProducts(items) {
+      const grid = document.getElementById('productsGrid');
+      grid.innerHTML = "";
+      if(items.length === 0) {
+        grid.innerHTML = `<p class="col-span-2 md:col-span-4 text-center text-gray-400 my-10 text-sm">Koi item nahi mila.</p>`;
+        return;
+      }
+      items.forEach(p => {
+        grid.innerHTML += `
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col justify-between p-3">
+            <div>
+              <img src="${p.image || ''}" alt="${p.name}" class="h-36 w-full object-cover rounded-xl bg-gray-50">
+              <h3 class="font-bold text-gray-800 text-xs mt-2 line-clamp-2">${p.name}</h3>
+              <p class="text-red-600 font-extrabold text-sm my-1">Rs. ${p.price}</p>
+            </div>
+            <div class="mt-auto pt-2">
+              <a href="https://wa.me{encodeURIComponent(p.name)}" target="_blank" class="block text-center bg-[#25D366] text-white py-2 rounded-xl text-[11px] font-bold shadow-sm">🟢 WhatsApp Order</a>
+              \${isLogged ? `<button onclick="deleteItem('\${p.id}')" class="w-full bg-red-50 text-red-600 py-1 rounded-lg text-[10px] font-bold mt-1 shadow-sm">Delete Item</button>` : ''}
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // Dynamic Image Compression Canvas Logic
+    document.getElementById('prodFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if(!file) return;
+      const r = new FileReader();
+      r.onload = function(ev) {
+        const img = new Image();
+        img.onload = function() {
+          const c = document.createElement("canvas");
+          c.width = 500;
+          c.height = img.height * (500 / img.width);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          base64Image = c.toDataURL("image/jpeg", 0.6);
+        }
+        img.src = ev.target.result;
+      }
+      r.readAsDataURL(file);
+    });
+
+    // Upload function
+    document.getElementById('uploadBtn').addEventListener('click', async function() {
+      const name = document.getElementById('prodName').value;
+      const price = document.getElementById('prodPrice').value;
+      if(!name || !price || !base64Image) return alert("Sub data fill karein!");
+      try {
+        await db.collection("products").add({ name, price, image: base64Image, createdAt: Date.now() });
+        document.getElementById('prodName').value = "";
+        document.getElementById('prodPrice').value = "";
+        base64Image = "";
+        alert("Stock product uploaded successfully!");
+        loadData();
+      } catch(err) { alert("Upload Failed: " + err.message); }
+    });
+
+    async function deleteItem(id) {
+      if(!confirm("Kya aap is item ko delete karna chahte hain?")) return;
+      try {
+        await db.collection("products").doc(id).delete();
+        alert("Deleted!");
+        loadData();
+      } catch(err) { alert(err.message); }
+    }
+
+    // UI Trigger actions
+    document.getElementById('adminBtn').addEventListener('click', () => document.getElementById('adminModal').classList.remove('hidden'));
+    document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('adminModal').classList.add('hidden'));
+    
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      const pass = document.getElementById('passInput').value;
+      if(pass === "Mitha@123") {
+        isLogged = true;
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('uploadView').classList.remove('hidden');
+        renderProducts(localProducts);
+      } else { alert("Wrong Control Panel Password!"); }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      isLogged = false;
+      document.getElementById('uploadView').classList.add('hidden');
+      document.getElementById('loginView').classList.remove('hidden');
+      document.getElementById('passInput').value = "";
+      renderProducts(localProducts);
+    });
+
+    // Filtering search logic
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      const val = e.target.value.toLowerCase();
+      const filtered = localProducts.filter(p => p.name.toLowerCase().includes(val));
+      renderProducts(filtered);
+    });
+
+    window.onload = loadData;
+  </script>
+</body>
+</html>

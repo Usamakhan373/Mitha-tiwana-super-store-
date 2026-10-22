@@ -1,0 +1,149 @@
+"use client";
+import { useState, useEffect } from "react";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+export default function Page() {
+  const [products, setProducts] = useState([]);
+  const [search, setSearch] = useState("");
+  const [admin, setAdmin] = useState(false);
+  const [login, setLogin] = useState(false);
+  const [pass, setPass] = useState("");
+  const [form, setForm] = useState({ name: "", price: "", image: "" });
+  const [loading, setLoading] = useState(true);
+
+  const EASYPAISA_NUMBER = "03247296703";
+  const WHATSAPP = "923247296703";
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+      const s = await getDocs(q);
+      setProducts(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error("Load Error:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const onImage = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = 600;
+        c.height = img.height * (600 / img.width);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        setForm({ ...form, image: c.toDataURL("image/jpeg", 0.6) });
+      };
+      img.src = ev.target.result;
+    };
+    r.readAsDataURL(file);
+  };
+
+  const add = async () => {
+    try {
+      if (!form.name || !form.price || !form.image) return alert("Sab bharo");
+      await addDoc(collection(db, "products"), { ...form, createdAt: Date.now() });
+      setForm({ name: "", price: "", image: "" });
+      alert("Uploaded!");
+      load();
+    } catch (err) {
+      console.error("Add Error:", err.message);
+      alert(err.message);
+    }
+  };
+
+  const del = async (id) => {
+    try {
+      if (!confirm("Delete?")) return;
+      await deleteDoc(doc(db, "products", id));
+      load();
+    } catch (err) {
+      console.error("Delete Error:", err.message);
+    }
+  };
+
+  const list = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <header className="bg-green-700 text-white p-4 flex justify-between items-center sticky top-0 z-40">
+        <div>
+          <h1 className="font-extrabold">Mitha Tiwana Super Store</h1>
+          <p className="text-[10px]">Khushab Delivery Active</p>
+        </div>
+        <button onClick={() => setAdmin(true)} className="bg-white text-green-700 px-4 py-1.5 rounded-full text-xs font-bold">Owner</button>
+      </header>
+
+      <div className="p-4 max-w-xl mx-auto">
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full border p-3 rounded-2xl bg-white" />
+      </div>
+
+      <main className="max-w-6xl mx-auto p-4">
+        {loading ? <p className="text-center py-20">Loading...</p> : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {list.map(p => (
+              <div key={p.id} className="bg-white rounded-2xl border p-3">
+                <img src={p.image} alt={p.name} className="h-36 w-full object-cover rounded-xl" />
+                <h3 className="font-bold text-xs mt-2">{p.name}</h3>
+                <p className="text-red-600 font-extrabold text-sm">Rs. {p.price}</p>
+                <a href={`https://wa.me/${WHATSAPP}?text=Salam ${encodeURIComponent(p.name)} chahiye`} target="_blank" className="block text-center bg-[#25D366] text-white py-2 rounded-xl text-xs font-bold mt-2">WhatsApp Order</a>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {admin && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm">
+            {!login ? (
+              <div>
+                <h2 className="font-black text-xl">Owner Login</h2>
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Mitha@123" className="w-full border p-3 rounded-xl mt-4" />
+                <button onClick={() => { if (pass === "Mitha@123") setLogin(true); else alert("Wrong"); }} className="w-full bg-green-700 text-white py-3 rounded-xl mt-3 font-bold">Login</button>
+                <button onClick={() => setAdmin(false)} className="w-full bg-gray-200 py-2 rounded mt-2">Close</button>
+              </div>
+            ) : (
+              <div>
+                <h2 className="font-bold">Add Product</h2>
+                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Name" className="w-full border p-2 rounded mt-2" />
+                <input value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Price" className="w-full border p-2 rounded mt-2" />
+                <input type="file" accept="image/*" onChange={onImage} className="w-full mt-2 text-xs" />
+                <button onClick={add} className="w-full bg-blue-600 text-white py-2.5 rounded-xl mt-3 font-bold">Upload</button>
+                <button onClick={() => setAdmin(false)} className="w-full bg-black text-white py-2 rounded mt-3">Back</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-around items-center z-40">
+        <div className="text-center">
+          <p className="text-[9px] text-gray-400 font-bold">EasyPaisa Account</p>
+          <p className="text-xs font-black">{EASYPAISA_NUMBER}</p>
+        </div>
+        <a href={`https://wa.me/${WHATSAPP}`} target="_blank" className="bg-[#25D366] text-white px-5 py-2 rounded-full text-xs font-bold">WhatsApp Show</a>
+      </footer>
+    </div>
+  );
+}
